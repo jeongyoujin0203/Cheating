@@ -362,6 +362,16 @@ nav {
   background: rgba(255,255,255,0.5);
 }
 
+.reveal-classroom-grid.teacher-flipped {
+  margin-bottom: 32px;
+}
+
+.reveal-classroom-grid.teacher-flipped ~ .board-label,
+.board-label.teacher-below {
+  margin-bottom: 0;
+  margin-top: 32px;
+}
+
 .reveal-classroom-grid {
   display: flex;
   gap: 12px;
@@ -673,6 +683,16 @@ input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px va
   margin: 24px 0;
   overflow-x: auto;
   padding-bottom: 12px;
+}
+
+.arrange-classroom.teacher-flipped,
+.reveal-classroom-grid.teacher-flipped {
+  transform: rotate(180deg);
+}
+
+.arrange-classroom.teacher-flipped .arrange-desk,
+.reveal-classroom-grid.teacher-flipped .reveal-desk {
+  transform: rotate(180deg);
 }
 
 .arrange-col { display: flex; flex-direction: column; gap: 10px; }
@@ -1100,17 +1120,21 @@ function isTeacherView() {
 }
 
 function getDisplayColIndexes() {
-  const indexes = Array.from({length: state.cols}, (_, i) => i);
-  return isTeacherView() ? indexes.reverse() : indexes;
+  return Array.from({length: state.cols}, (_, i) => i);
 }
 
 function getDisplayRowIndexes(rows) {
   const indexes = Array.from({length: rows}, (_, i) => i);
-  return isTeacherView() ? indexes.reverse() : indexes;
+  return indexes; // 항상 0,1,2... 순서 — 선생님/학생 뷰 모두 칠판쪽부터
+}
+
+function getMaxRows() {
+  return Math.max(...state.colRows, 0);
 }
 
 function renderBoardWithGrid(boardClass, gridId, gridClass) {
-  const board = `<div class="${boardClass}">칠판</div>`;
+  const extraClass = isTeacherView() ? ' teacher-below' : '';
+  const board = `<div class="${boardClass}${extraClass}">칠판</div>`;
   const grid = `<div class="${gridClass}" id="${gridId}"></div>`;
   return isTeacherView() ? `${grid}${board}` : `${board}${grid}`;
 }
@@ -1420,9 +1444,9 @@ function selectStudent(num) {
 
 function renderArrangeGrid() {
   const displayCols = getDisplayColIndexes();
-  document.getElementById('arrange-grid').innerHTML = displayCols.map((ci, displayIndex) => {
+  document.getElementById('arrange-grid').innerHTML = displayCols.map((ci) => {
     const rows = state.colRows[ci];
-    const desks = getDisplayRowIndexes(rows).map((ri) => {
+    const desks = Array.from({length: rows}, (_, ri) => {
       const key = deskKey(ci, ri);
       const sNum = state.arrangement[key];
       const s = sNum ? state.students.find(x => x.num===sNum) : null;
@@ -1430,10 +1454,12 @@ function renderArrangeGrid() {
         ${s ? `${s.num}. ${s.name}` : `<span style="font-size:10px;opacity:0.4;">${ci+1}열 ${ri+1}번</span>`}
       </div>`;
     }).join('');
-    const originalGapIndex = isTeacherView() ? ci - 1 : ci;
-    const gapAfter = state.colGaps[originalGapIndex] ? 'margin-right:24px;' : '';
+    const gapAfter = state.colGaps[ci] ? 'margin-right:24px;' : '';
     return `<div class="arrange-col" style="${gapAfter}">${desks}</div>`;
   }).join('');
+  // 선생님 뷰면 그리드 회전
+  const grid = document.getElementById('arrange-grid');
+  if (grid) grid.classList.toggle('teacher-flipped', isTeacherView());
 }
 
 function assignDesk(ci, ri) {
@@ -1625,7 +1651,7 @@ function renderRevealGrid(revealedNums, highlightKey) {
   const displayCols = getDisplayColIndexes();
   grid.innerHTML = displayCols.map((ci) => {
     const rows = state.colRows[ci];
-    const desks = getDisplayRowIndexes(rows).map((ri) => {
+    const desks = Array.from({length: rows}, (_, ri) => {
       const key = deskKey(ci, ri);
       const sNum = state.arrangement[key];
       const isRevealed = sNum && set.has(sNum);
@@ -1635,16 +1661,15 @@ function renderRevealGrid(revealedNums, highlightKey) {
         ${isRevealed && s ? `${s.num}. ${s.name}` : ''}
       </div>`;
     }).join('');
-    const originalGapIndex = isTeacherView() ? ci - 1 : ci;
-    const gapAfter = state.colGaps[originalGapIndex] ? 'margin-right:24px;' : '';
+    const gapAfter = state.colGaps[ci] ? 'margin-right:24px;' : '';
     return `<div class="reveal-col" style="${gapAfter}">${desks}</div>`;
   }).join('');
+  grid.classList.toggle('teacher-flipped', isTeacherView());
 }
 
 
 function getGapAfterForDisplayCol(ci) {
-  const gapIndex = isTeacherView() ? ci - 1 : ci;
-  return !!state.colGaps[gapIndex];
+  return !!state.colGaps[ci];
 }
 
 function drawRoundRect(ctx, x, y, w, h, r) {
